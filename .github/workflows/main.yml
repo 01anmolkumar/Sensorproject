@@ -41,7 +41,7 @@ jobs:
           sudo apt-get install -y jq unzip
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -51,26 +51,28 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Set ECR variables
+        run: |
+          echo "ECR_REGISTRY=${{ secrets.AWS_ECR_REGISTRY }}" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY=${{ secrets.AWS_ECR_REPOSITORY }}" >> $GITHUB_ENV
+
       - name: Build, tag, and push Docker image to Amazon ECR
         id: build-image
         env:
-          Image_TAG: latest
-        run:
-        # Build a docker container and
-        # push it to ecr so that it can 
-        # be deployed to ecs.
+          IMAGE_TAG: latest
+        run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG 
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    Continuous-Deployment:
+  Continuous-Deployment:
     needs: build-and-push-ecr-image
-    runs-on: self-hosted
+    runs-on: ubuntu-latest  # Change to 'self-hosted' only if you have a runner
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -86,7 +88,12 @@ jobs:
 
       - name: Run Docker Image to serve users
         run: |
-          docker run -d -p 8080:8080 --name=sensor -e 'MONGO_DB_URL=${{ secrets.MONGO_DB_URL }}' -e 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' -e 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -e 'AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}' ${{ secrets.AWS_ECR_REPO_URI }}:latest
+          docker run -d -p 8080:8080 --name=sensor \
+            -e 'MONGO_DB_URL=${{ secrets.MONGO_DB_URL }}' \
+            -e 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' \
+            -e 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
+            -e 'AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}' \
+            ${{ secrets.AWS_ECR_REPO_URI }}:latest
 
       - name: Clean previous images and containers
-        run: docker system prune -f   
+        run: docker system prune -f
