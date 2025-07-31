@@ -58,6 +58,7 @@ jobs:
           docker push ${{ secrets.AWS_ECR_REPO_URI }}:${IMAGE_TAG}
 
   Continuous-Deployment:
+    name: Continuous Deployment
     needs: build-and-push-ecr-image
     runs-on: self-hosted
     steps:
@@ -75,13 +76,8 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Pull latest images
-        run: |
-          docker pull ${{ secrets.AWS_ECR_REPO_URI }}:latest
-
-      # Optional: Stop and remove old container if running
-      # - name: Stop and remove visibility container if running
-      #   run: docker ps -q --filter "name=visibility" | grep -q . && docker stop visibility && docker rm visibility || true
+      - name: Pull latest image
+        run: docker pull ${{ secrets.AWS_ECR_REPO_URI }}:latest
 
       - name: Run Docker image to serve users
         run: docker run -d -p 8080:8080 --name=visibility \
