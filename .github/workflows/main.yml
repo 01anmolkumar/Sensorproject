@@ -29,6 +29,8 @@ jobs:
     name: Continuous Delivery
     needs: integration
     runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -50,13 +52,10 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build, tag, and push image to Amazon ECR
-        env:
-          IMAGE_TAG: latest
         run: |
-          docker build -t ${{ secrets.AWS_ECR_REPO_URI }}:${IMAGE_TAG} .
-          docker push ${{ secrets.AWS_ECR_REPO_URI }}:${IMAGE_TAG}
+          docker build -t ${{ secrets.AWS_ECR_REPO_URI }}:${{ env.IMAGE_TAG }} .
+          docker push ${{ secrets.AWS_ECR_REPO_URI }}:${{ env.IMAGE_TAG }}
 
-      # 🚀 OPTIONAL: Push to DockerHub
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
@@ -64,11 +63,9 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and Push to DockerHub
-        env:
-          IMAGE_TAG: latest
         run: |
-          docker tag ${{ secrets.AWS_ECR_REPO_URI }}:${IMAGE_TAG} anmolkumar123/my-image:${IMAGE_TAG}
-          docker push anmolkumar123/my-image:${IMAGE_TAG}
+          docker tag ${{ secrets.AWS_ECR_REPO_URI }}:${{ env.IMAGE_TAG }} ${{ secrets.DOCKER_USERNAME }}/my-image:${{ env.IMAGE_TAG }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-image:${{ env.IMAGE_TAG }}
 
   Continuous-Deployment:
     name: Continuous Deployment
@@ -91,6 +88,11 @@ jobs:
 
       - name: Pull latest image
         run: docker pull ${{ secrets.AWS_ECR_REPO_URI }}:latest
+
+      - name: Stop and Remove Previous Container (if exists)
+        run: |
+          docker stop visibility || true
+          docker rm visibility || true
 
       - name: Run Docker image to serve users
         run: docker run -d -p 8080:8080 --name=visibility \
